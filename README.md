@@ -43,7 +43,7 @@ tf ver
 ### go install (recommended)
 
 ```sh
-go install github.com/andygeorge/tf@latest
+go install github.com/andygeorge/tf@v1.0.0
 ```
 
 ### Build from source
