@@ -1,6 +1,6 @@
-# tf
+# tf (VIBECODED)
 
-tf is a wrapper for [terraform](https://github.com/hashicorp/terraform/) with much-simplified and improved output.
+tf is an _extremely vibecoded_ wrapper for [terraform](https://github.com/hashicorp/terraform/) with much-simplified and improved output.
 
 ## Features
 
