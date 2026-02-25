@@ -103,10 +103,10 @@ func filterOutput(r io.Reader, w io.Writer) {
 
 	var state filterState
 	depth := 0
-	inNote := false        // suppress multi-line "Note:" advisory
-	inIntroBlock := false  // suppress "Terraform used the selected providers" block
-	pendingBlank := false  // defer blank lines so inter-header blanks can be dropped
-	hasEmitted := false    // suppress leading blank before first real content
+	inNote := false       // suppress multi-line "Note:" advisory
+	inIntroBlock := false // suppress "Terraform used the selected providers" block
+	pendingBlank := false // defer blank lines so inter-header blanks can be dropped
+	hasEmitted := false   // suppress leading blank before first real content
 
 	emit := func(line string) {
 		if pendingBlank && hasEmitted {

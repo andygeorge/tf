@@ -51,7 +51,7 @@ go install github.com/andygeorge/tf@latest
 ```sh
 git clone https://github.com/andygeorge/tf
 cd tf
-go build -o tf .
+make build
 ```
 
 ## Usage
@@ -71,6 +71,25 @@ tf destroy -auto-approve
 tf ver
 ```
 
+## Development
+
+### Local build pipeline
+
+```sh
+make check   # fmt + vet + lint + test (full pipeline)
+make test    # run tests with race detector and coverage
+make build   # compile ./tf binary
+make install # install to GOPATH/bin
+make clean   # remove build artifacts
+make help    # list all targets
+```
+
+Optional: install [staticcheck](https://staticcheck.io/) for additional linting:
+
+```sh
+go install honnef.co/go/tools/cmd/staticcheck@latest
+```
+
 ## Versioning
 
 Releases follow [semver](https://semver.org/) and are tagged `vX.Y.Z` on the `main` branch.
@@ -79,5 +98,7 @@ Releases follow [semver](https://semver.org/) and are tagged `vX.Y.Z` on the `ma
 To build with an explicit version string:
 
 ```sh
+make build VERSION=v1.2.3
+# or manually:
 go build -ldflags "-X main.version=v1.2.3" -o tf .
 ```
