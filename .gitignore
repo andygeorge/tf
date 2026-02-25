@@ -1,0 +1,8 @@
+.git/
+dist/
+build/
+.env
+*.log
+.DS_Store
+.claude/
+CLAUDE.md
