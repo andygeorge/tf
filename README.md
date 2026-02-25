@@ -31,6 +31,29 @@ During `plan` and `apply`, verbose resource change blocks are collapsed to their
 
 All arguments and flags are forwarded directly to `terraform`, so `tf` is a complete drop-in replacement.
 
+### Version
+
+```sh
+tf ver
+# tf v1.2.3
+```
+
+## Install
+
+### go install (recommended)
+
+```sh
+go install github.com/andygeorge/tf@latest
+```
+
+### Build from source
+
+```sh
+git clone https://github.com/andygeorge/tf
+cd tf
+go build -o tf .
+```
+
 ## Usage
 
 ```
@@ -45,12 +68,16 @@ tf plan
 tf apply
 tf plan -target=module.api
 tf destroy -auto-approve
+tf ver
 ```
 
-## Install
+## Versioning
 
-Build from source:
+Releases follow [semver](https://semver.org/) and are tagged `vX.Y.Z` on the `main` branch.
+`go install github.com/andygeorge/tf@latest` always gets the latest release.
+
+To build with an explicit version string:
 
 ```sh
-go build -o tf .
+go build -ldflags "-X main.version=v1.2.3" -o tf .
 ```

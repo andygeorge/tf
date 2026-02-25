@@ -7,8 +7,23 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime/debug"
 	"strings"
 )
+
+// version is set at build time via -ldflags "-X main.version=vX.Y.Z".
+// Falls back to the module version embedded by go install.
+var version = ""
+
+func getVersion() string {
+	if version != "" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return "dev"
+}
 
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
@@ -206,6 +221,11 @@ func filterOutput(r io.Reader, w io.Writer) {
 
 func main() {
 	args := os.Args[1:]
+
+	if len(args) == 1 && args[0] == "ver" {
+		fmt.Printf("tf %s\n", getVersion())
+		os.Exit(0)
+	}
 
 	cmd := exec.Command("terraform", args...)
 	cmd.Stdin = os.Stdin
