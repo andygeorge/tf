@@ -27,6 +27,23 @@ During `plan` and `apply`, verbose resource change blocks are collapsed to their
   # module.api.module.ami.aws_ebs_volume.arm64-ubuntu-22_04 must be replaced
 ```
 
+### Target flag generation
+
+`tf target` runs `terraform plan` and outputs all changed resources as `-target=` flags, ready to paste into a follow-up `terraform apply` command. Each line ends with `\` for multi-line shell input except the last.
+
+```sh
+tf target
+# -target=module.api.aws_autoscaling_group.myapp \
+# -target=module.api.aws_cloudwatch_log_group.myapp-cache \
+# -target=module.api.aws_launch_template.api
+```
+
+Additional plan arguments are forwarded:
+
+```sh
+tf target -var-file=prod.tfvars
+```
+
 ### Full terraform passthrough
 
 All arguments and flags are forwarded directly to `terraform`, so `tf` is a complete drop-in replacement.
@@ -69,6 +86,8 @@ tf apply
 tf plan -target=module.api
 tf destroy -auto-approve
 tf ver
+tf target
+tf target -var-file=prod.tfvars
 ```
 
 ## Development

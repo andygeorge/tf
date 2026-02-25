@@ -219,11 +219,68 @@ func filterOutput(r io.Reader, w io.Writer) {
 	}
 }
 
+// targetOutput reads terraform plan output from r, extracts resource addresses
+// from "  # <address> <action>" header lines, and writes them to w as
+// -target= flags suitable for pasting into a shell command. Each line ends
+// with " \" except the last.
+func targetOutput(r io.Reader, w io.Writer) {
+	scanner := bufio.NewScanner(r)
+	buf := make([]byte, 1024*1024)
+	scanner.Buffer(buf, len(buf))
+
+	var targets []string
+	for scanner.Scan() {
+		plain := stripANSI(scanner.Text())
+		if strings.HasPrefix(plain, "  # ") && !strings.HasPrefix(plain, "  # (") {
+			trimmed := plain[4:]
+			if idx := strings.Index(trimmed, " "); idx > 0 {
+				targets = append(targets, trimmed[:idx])
+			}
+		}
+	}
+
+	for i, t := range targets {
+		if i < len(targets)-1 {
+			fmt.Fprintf(w, "-target=%s \\\n", t)
+		} else {
+			fmt.Fprintf(w, "-target=%s\n", t)
+		}
+	}
+}
+
 func main() {
 	args := os.Args[1:]
 
 	if len(args) == 1 && args[0] == "ver" {
 		fmt.Printf("tf %s\n", getVersion())
+		os.Exit(0)
+	}
+
+	if len(args) >= 1 && args[0] == "target" {
+		planArgs := append([]string{"plan"}, args[1:]...)
+		cmd := exec.Command("terraform", planArgs...)
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tf: %v\n", err)
+			os.Exit(1)
+		}
+		if err := cmd.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "tf: %v\n", err)
+			os.Exit(1)
+		}
+
+		targetOutput(stdout, os.Stdout)
+
+		if err := cmd.Wait(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				os.Exit(exitErr.ExitCode())
+			}
+			fmt.Fprintf(os.Stderr, "tf: %v\n", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 

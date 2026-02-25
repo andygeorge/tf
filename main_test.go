@@ -172,6 +172,79 @@ func TestFilterOutput_PipedFormat(t *testing.T) {
 	}
 }
 
+func TestTargetOutput_Basic(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_autoscaling_group.myapp will be destroyed
+  # (because aws_autoscaling_group.myapp is not in configuration)
+  # module.api.aws_cloudwatch_log_group.myapp-cache will be destroyed
+  # module.api.aws_launch_template.api will be updated in-place
+
+Plan: 0 to add, 1 to change, 2 to destroy.`
+
+	var out bytes.Buffer
+	targetOutput(strings.NewReader(input), &out)
+	got := out.String()
+
+	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %q", len(lines), got)
+	}
+	if lines[0] != `-target=module.api.aws_autoscaling_group.myapp \` {
+		t.Errorf("line 0: %q", lines[0])
+	}
+	if lines[1] != `-target=module.api.aws_cloudwatch_log_group.myapp-cache \` {
+		t.Errorf("line 1: %q", lines[1])
+	}
+	if lines[2] != `-target=module.api.aws_launch_template.api` {
+		t.Errorf("line 2 (last, no backslash): %q", lines[2])
+	}
+}
+
+func TestTargetOutput_SingleResource(t *testing.T) {
+	input := `  # module.api.aws_instance.web must be replaced
+Plan: 1 to add, 0 to change, 1 to destroy.`
+
+	var out bytes.Buffer
+	targetOutput(strings.NewReader(input), &out)
+	got := strings.TrimRight(out.String(), "\n")
+
+	if got != `-target=module.api.aws_instance.web` {
+		t.Errorf("single resource should have no backslash: %q", got)
+	}
+}
+
+func TestTargetOutput_NoResources(t *testing.T) {
+	input := `No changes. Your infrastructure matches the configuration.`
+
+	var out bytes.Buffer
+	targetOutput(strings.NewReader(input), &out)
+	if out.Len() != 0 {
+		t.Errorf("expected empty output, got %q", out.String())
+	}
+}
+
+func TestTargetOutput_ANSICodes(t *testing.T) {
+	// Headers with ANSI codes should still be extracted correctly.
+	input := "\x1b[1m  # module.api.aws_autoscaling_group.myapp\x1b[0m will be \x1b[31mdestroyed\x1b[0m\n" +
+		"\x1b[1m  # module.api.aws_instance.web\x1b[0m must be \x1b[31mreplaced\x1b[0m\n"
+
+	var out bytes.Buffer
+	targetOutput(strings.NewReader(input), &out)
+	got := out.String()
+
+	if !strings.Contains(got, "-target=module.api.aws_autoscaling_group.myapp") {
+		t.Error("first target missing")
+	}
+	if !strings.Contains(got, "-target=module.api.aws_instance.web") {
+		t.Error("second target missing")
+	}
+	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+	if strings.HasSuffix(lines[len(lines)-1], `\`) {
+		t.Error("last line should not end with backslash")
+	}
+}
+
 func TestFilterOutput_ANSICodes(t *testing.T) {
 	// Preamble line with ANSI codes should be suppressed.
 	preambleLine := "\x1b[0m\x1b[1mmodule.api.random_password: Refreshing state... [id=none]\x1b[0m"
