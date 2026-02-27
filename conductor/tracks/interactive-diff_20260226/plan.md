@@ -75,7 +75,7 @@ Handle edge cases, clean up, and ensure the feature is ready for use.
 
 ### Tasks
 
-- [ ] Task 4.1: Handle edge cases — empty plan (no resource changes shows a
+- [x] Task 4.1: Handle edge cases — empty plan (no resource changes shows a
       "No changes." message and exits immediately), single resource, large
       numbers of resources.
 - [ ] Task 4.2: Update README.md with usage notes for the interactive diff viewer.

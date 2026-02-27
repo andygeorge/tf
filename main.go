@@ -319,6 +319,7 @@ type Viewer struct {
 	blocks   []ResourceBlock
 	cursor   int
 	expanded []bool
+	offset   int // index of first visible block (for viewport scrolling)
 }
 
 func newViewer(blocks []ResourceBlock) *Viewer {
@@ -351,14 +352,40 @@ func (v *Viewer) toggle() {
 	v.expanded[v.cursor] = !v.expanded[v.cursor]
 }
 
-// render writes the full viewer UI to w. Uses \r\n for correct rendering in
+// scrollToCursor adjusts v.offset so that cursor is within the visible
+// viewport of viewportSize blocks. If viewportSize <= 0, does nothing.
+func (v *Viewer) scrollToCursor(viewportSize int) {
+	if viewportSize <= 0 || len(v.blocks) == 0 {
+		return
+	}
+	if v.cursor < v.offset {
+		v.offset = v.cursor
+	}
+	if v.cursor >= v.offset+viewportSize {
+		v.offset = v.cursor - viewportSize + 1
+	}
+}
+
+// render writes the viewer UI to w. viewportSize limits the number of
+// resource blocks shown (0 = show all). Uses \r\n for correct rendering in
 // raw terminal mode.
-func render(v *Viewer, w io.Writer) {
+func render(v *Viewer, w io.Writer, viewportSize int) {
 	fmt.Fprint(w, viewerClearScreen+viewerCursorHome)
 	fmt.Fprintf(w, "\x1b[1m tf interactive diff — %d resource(s) \x1b[0m\r\n", len(v.blocks))
 	fmt.Fprint(w, "  j/k or \u2191\u2193 to navigate  Enter/Space to expand  q to quit\r\n\r\n")
 
-	for i, b := range v.blocks {
+	start := v.offset
+	end := len(v.blocks)
+	if viewportSize > 0 && start+viewportSize < end {
+		end = start + viewportSize
+	}
+
+	if start > 0 {
+		fmt.Fprintf(w, "  \u2191 %d more above\r\n", start)
+	}
+
+	for i := start; i < end; i++ {
+		b := v.blocks[i]
 		if i == v.cursor {
 			fmt.Fprintf(w, "%s\u25b6 %s%s\r\n", viewerInvert, b.Summary, viewerBoldReset)
 		} else {
@@ -373,6 +400,10 @@ func render(v *Viewer, w io.Writer) {
 				}
 			}
 		}
+	}
+
+	if end < len(v.blocks) {
+		fmt.Fprintf(w, "  \u2193 %d more below\r\n", len(v.blocks)-end)
 	}
 }
 
@@ -394,7 +425,20 @@ func runViewer(blocks []ResourceBlock) error {
 
 	v := newViewer(blocks)
 	fmt.Fprint(os.Stdout, viewerAltEnter+viewerCursorHide)
-	render(v, os.Stdout)
+
+	// viewportBlocks returns the number of resource blocks that fit on screen.
+	// It reserves 4 lines for the header, help text, and blank lines.
+	viewportBlocks := func() int {
+		_, h, err := term.GetSize(int(os.Stdout.Fd()))
+		if err != nil || h <= 4 {
+			return 0 // fallback: render all
+		}
+		return h - 4
+	}
+
+	vp := viewportBlocks()
+	v.scrollToCursor(vp)
+	render(v, os.Stdout, vp)
 
 	buf := make([]byte, 4)
 	quit := false
@@ -414,7 +458,9 @@ func runViewer(blocks []ResourceBlock) error {
 			v.toggle()
 		}
 		if !quit {
-			render(v, os.Stdout)
+			vp = viewportBlocks()
+			v.scrollToCursor(vp)
+			render(v, os.Stdout, vp)
 		}
 	}
 

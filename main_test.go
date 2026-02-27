@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -606,7 +607,7 @@ func TestRender_Header(t *testing.T) {
 	blocks := []ResourceBlock{{Summary: "module.api.aws_instance.web will be created"}}
 	v := newViewer(blocks)
 	var buf bytes.Buffer
-	render(v, &buf)
+	render(v, &buf, 0)
 	got := buf.String()
 
 	if !strings.Contains(got, "tf interactive diff") {
@@ -624,7 +625,7 @@ func TestRender_CursorHighlight(t *testing.T) {
 	}
 	v := newViewer(blocks) // cursor at 0
 	var buf bytes.Buffer
-	render(v, &buf)
+	render(v, &buf, 0)
 	got := buf.String()
 
 	// The cursor indicator should appear before the first block.
@@ -651,7 +652,7 @@ func TestRender_ExpandedBlock(t *testing.T) {
 	v.toggle() // expand block 0
 
 	var buf bytes.Buffer
-	render(v, &buf)
+	render(v, &buf, 0)
 	got := buf.String()
 
 	if !strings.Contains(got, `resource "aws_instance"`) {
@@ -670,7 +671,7 @@ func TestRender_CollapsedBlock(t *testing.T) {
 	// Block is collapsed by default.
 
 	var buf bytes.Buffer
-	render(v, &buf)
+	render(v, &buf, 0)
 	got := buf.String()
 
 	if strings.Contains(got, `resource "aws_instance"`) {
@@ -686,10 +687,61 @@ func TestRender_EmptyBody(t *testing.T) {
 	v.toggle() // expand
 
 	var buf bytes.Buffer
-	render(v, &buf)
+	render(v, &buf, 0)
 	got := buf.String()
 
 	if !strings.Contains(got, "no diff body captured") {
 		t.Error("nil body should show 'no diff body captured' message")
+	}
+}
+
+// --- Viewport / scrolling tests ---
+
+func TestViewer_ScrollToCursor(t *testing.T) {
+	blocks := make([]ResourceBlock, 10)
+	for i := range blocks {
+		blocks[i] = ResourceBlock{Summary: fmt.Sprintf("resource.%d", i)}
+	}
+	v := newViewer(blocks)
+
+	// Move cursor to block 7 with viewport of 5.
+	v.cursor = 7
+	v.scrollToCursor(5)
+	// Offset should be at most cursor - viewportSize + 1 = 3.
+	if v.offset > 3 {
+		t.Errorf("offset should be ≤ 3 to keep cursor in view, got %d", v.offset)
+	}
+
+	// Move cursor to block 0 — offset should scroll back to 0.
+	v.cursor = 0
+	v.scrollToCursor(5)
+	if v.offset != 0 {
+		t.Errorf("offset should be 0 when cursor at top, got %d", v.offset)
+	}
+}
+
+func TestViewer_ScrollIndicators(t *testing.T) {
+	blocks := make([]ResourceBlock, 10)
+	for i := range blocks {
+		blocks[i] = ResourceBlock{Summary: fmt.Sprintf("module.api.resource.res%d will be created", i)}
+	}
+	v := newViewer(blocks)
+	v.offset = 3 // simulate having scrolled down
+
+	var buf bytes.Buffer
+	render(v, &buf, 5) // viewport of 5 blocks
+	got := buf.String()
+
+	// Should show "more above" since offset > 0.
+	if !strings.Contains(got, "more above") {
+		t.Error("should show scroll indicator for hidden blocks above")
+	}
+	// Should show "more below" since 3+5=8 < 10.
+	if !strings.Contains(got, "more below") {
+		t.Error("should show scroll indicator for hidden blocks below")
+	}
+	// Should not show blocks 0-2 (above offset).
+	if strings.Contains(got, "res0") || strings.Contains(got, "res1") || strings.Contains(got, "res2") {
+		t.Error("blocks above offset should not be rendered")
 	}
 }
