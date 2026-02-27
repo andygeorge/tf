@@ -78,7 +78,7 @@ Handle edge cases, clean up, and ensure the feature is ready for use.
 - [x] Task 4.1: Handle edge cases — empty plan (no resource changes shows a
       "No changes." message and exits immediately), single resource, large
       numbers of resources.
-- [ ] Task 4.2: Update README.md with usage notes for the interactive diff viewer.
+- [x] Task 4.2: Update README.md with usage notes for the interactive diff viewer.
 - [ ] Task 4.3: Run full `make check` and fix any fmt/vet/lint issues.
 
 ### Verification

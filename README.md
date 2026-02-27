@@ -24,7 +24,43 @@ During `plan` and `apply`, verbose resource change blocks are collapsed to their
 
 **After (`tf`):**
 ```
-  # module.api.module.ami.aws_ebs_volume.arm64-ubuntu-22_04 must be replaced
+module.api.module.ami.aws_ebs_volume.arm64-ubuntu-22_04 must be replaced
+```
+
+### Interactive diff viewer
+
+When `tf plan` or `tf apply` is run in a terminal (not piped), resource change
+blocks are displayed in an interactive viewer after the command completes:
+
+```
+ tf interactive diff — 3 resource(s)
+  j/k or ↑↓ to navigate  Enter/Space to expand  q to quit
+
+▶ module.api.aws_autoscaling_group.myapp will be destroyed
+  module.api.aws_cloudwatch_log_group.myapp-cache will be destroyed
+  module.api.aws_launch_template.api will be updated in-place
+```
+
+**Keyboard controls:**
+
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Move cursor down |
+| `k` / `↑` | Move cursor up |
+| `Enter` / `Space` | Expand / collapse selected resource diff |
+| `q` / `Ctrl-C` | Quit viewer |
+
+When `q` is pressed, the viewer exits and the collapsed summaries are printed
+to the terminal for scrollback reference.
+
+**Non-interactive fallback:** when stdout is piped or redirected (e.g. in CI),
+the plain collapsed output is printed instead:
+
+```sh
+tf plan | cat
+# module.api.aws_autoscaling_group.myapp will be destroyed
+# module.api.aws_cloudwatch_log_group.myapp-cache will be destroyed
+# module.api.aws_launch_template.api will be updated in-place
 ```
 
 ### Target flag generation
