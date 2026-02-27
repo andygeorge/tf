@@ -43,7 +43,7 @@ expand/collapse state.
       indicator; draw full body lines for expanded blocks.
 - [x] Task 2.3: Implement keyboard input handling — arrow keys / j/k to move
       cursor, Enter/Space to toggle expand/collapse, q/Ctrl-C to quit.
-- [ ] Task 2.4: Write unit tests for viewer state transitions (navigate, expand,
+- [x] Task 2.4: Write unit tests for viewer state transitions (navigate, expand,
       collapse, exit).
 
 ### Verification

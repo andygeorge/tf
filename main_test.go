@@ -506,3 +506,190 @@ Plan: 0 to add, 0 to change, 2 to destroy.`
 		t.Error("second block summary missing")
 	}
 }
+
+// --- Viewer state transition tests ---
+
+func TestViewer_Navigate(t *testing.T) {
+	blocks := []ResourceBlock{
+		{Summary: "a"},
+		{Summary: "b"},
+		{Summary: "c"},
+	}
+	v := newViewer(blocks)
+
+	if v.cursor != 0 {
+		t.Errorf("initial cursor should be 0, got %d", v.cursor)
+	}
+
+	v.navigate(+1)
+	if v.cursor != 1 {
+		t.Errorf("expected cursor 1, got %d", v.cursor)
+	}
+
+	v.navigate(+1)
+	if v.cursor != 2 {
+		t.Errorf("expected cursor 2, got %d", v.cursor)
+	}
+
+	// Clamp at end.
+	v.navigate(+10)
+	if v.cursor != 2 {
+		t.Errorf("cursor should clamp at 2, got %d", v.cursor)
+	}
+
+	v.navigate(-1)
+	if v.cursor != 1 {
+		t.Errorf("expected cursor 1, got %d", v.cursor)
+	}
+
+	// Clamp at start.
+	v.navigate(-100)
+	if v.cursor != 0 {
+		t.Errorf("cursor should clamp at 0, got %d", v.cursor)
+	}
+}
+
+func TestViewer_Toggle(t *testing.T) {
+	blocks := []ResourceBlock{{Summary: "a"}}
+	v := newViewer(blocks)
+
+	if v.expanded[0] {
+		t.Error("block should start collapsed")
+	}
+
+	v.toggle()
+	if !v.expanded[0] {
+		t.Error("block should be expanded after toggle")
+	}
+
+	v.toggle()
+	if v.expanded[0] {
+		t.Error("block should be collapsed after second toggle")
+	}
+}
+
+func TestViewer_EmptyBlocks(t *testing.T) {
+	v := newViewer(nil)
+	// Should not panic.
+	v.navigate(+1)
+	v.navigate(-1)
+	v.toggle()
+	if v.cursor != 0 {
+		t.Errorf("cursor should remain 0 for empty viewer, got %d", v.cursor)
+	}
+}
+
+func TestViewer_ToggleAtCursor(t *testing.T) {
+	blocks := []ResourceBlock{
+		{Summary: "a"},
+		{Summary: "b"},
+		{Summary: "c"},
+	}
+	v := newViewer(blocks)
+	v.navigate(+1) // cursor at 1
+	v.toggle()
+
+	if v.expanded[0] {
+		t.Error("block 0 should not be expanded")
+	}
+	if !v.expanded[1] {
+		t.Error("block 1 (at cursor) should be expanded")
+	}
+	if v.expanded[2] {
+		t.Error("block 2 should not be expanded")
+	}
+}
+
+// --- Viewer render tests ---
+
+func TestRender_Header(t *testing.T) {
+	blocks := []ResourceBlock{{Summary: "module.api.aws_instance.web will be created"}}
+	v := newViewer(blocks)
+	var buf bytes.Buffer
+	render(v, &buf)
+	got := buf.String()
+
+	if !strings.Contains(got, "tf interactive diff") {
+		t.Error("render should contain viewer header")
+	}
+	if !strings.Contains(got, "1 resource") {
+		t.Error("render should show resource count")
+	}
+}
+
+func TestRender_CursorHighlight(t *testing.T) {
+	blocks := []ResourceBlock{
+		{Summary: "res.a"},
+		{Summary: "res.b"},
+	}
+	v := newViewer(blocks) // cursor at 0
+	var buf bytes.Buffer
+	render(v, &buf)
+	got := buf.String()
+
+	// The cursor indicator should appear before the first block.
+	if !strings.Contains(got, viewerInvert+"▶ ") {
+		t.Error("cursor indicator (invert+arrow) should appear for selected block")
+	}
+	// The second block should not be highlighted.
+	lines := strings.Split(got, "\n")
+	for _, l := range lines {
+		if strings.Contains(l, "res.b") && strings.Contains(l, viewerInvert) {
+			t.Error("non-selected block should not have cursor highlight")
+		}
+	}
+}
+
+func TestRender_ExpandedBlock(t *testing.T) {
+	blocks := []ResourceBlock{
+		{
+			Summary: "module.api.aws_instance.web must be replaced",
+			Body:    []string{`+ resource "aws_instance" "web" {`, "    ami = \"new\"", "  }"},
+		},
+	}
+	v := newViewer(blocks)
+	v.toggle() // expand block 0
+
+	var buf bytes.Buffer
+	render(v, &buf)
+	got := buf.String()
+
+	if !strings.Contains(got, `resource "aws_instance"`) {
+		t.Error("expanded block should show body content")
+	}
+}
+
+func TestRender_CollapsedBlock(t *testing.T) {
+	blocks := []ResourceBlock{
+		{
+			Summary: "module.api.aws_instance.web must be replaced",
+			Body:    []string{`+ resource "aws_instance" "web" {`, "    ami = \"new\"", "  }"},
+		},
+	}
+	v := newViewer(blocks)
+	// Block is collapsed by default.
+
+	var buf bytes.Buffer
+	render(v, &buf)
+	got := buf.String()
+
+	if strings.Contains(got, `resource "aws_instance"`) {
+		t.Error("collapsed block should not show body content")
+	}
+}
+
+func TestRender_EmptyBody(t *testing.T) {
+	blocks := []ResourceBlock{
+		{Summary: "module.api.aws_instance.web will be destroyed", Body: nil},
+	}
+	v := newViewer(blocks)
+	v.toggle() // expand
+
+	var buf bytes.Buffer
+	render(v, &buf)
+	got := buf.String()
+
+	if !strings.Contains(got, "no diff body captured") {
+		t.Error("nil body should show 'no diff body captured' message")
+	}
+}
