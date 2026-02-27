@@ -1,0 +1,19 @@
+{
+  "id": "interactive-diff_20260226",
+  "title": "Interactive Diff Toggle",
+  "type": "feature",
+  "status": "in_progress",
+  "created": "2026-02-26T00:00:00Z",
+  "updated": "2026-02-27T00:00:00Z",
+  "current_phase": 1,
+  "current_task": "1.1",
+  "phases": {
+    "total": 4,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 13,
+    "completed": 0
+  },
+  "commits": []
+}

@@ -87,33 +87,57 @@ const (
 	stateInBlock                 // suppressing a resource block's body
 )
 
-// filterOutput reads terraform plan/apply output from r and writes a collapsed
-// version to w. It suppresses:
-//   - state-refresh preamble lines (Refreshing state, Reading, etc.)
-//   - invisible ANSI-only lines
-//   - box-drawing separator and the "Note: You didn't use -out" advisory
-//   - resource block bodies (keeping only the "  # resource" header line)
-//   - blank lines between consecutive resource headers
-//
-// A single blank line is preserved as a separator before the "Plan:" summary.
-func filterOutput(r io.Reader, w io.Writer) {
+// ResourceBlock holds a single terraform resource change as parsed from
+// plan/apply output. Summary is the formatted single-line bold header.
+// Body contains the raw diff lines of the block (may be nil for piped/no-body format).
+type ResourceBlock struct {
+	Summary string
+	Body    []string
+}
+
+// parseResult holds the structured output of parseBlocks.
+type parseResult struct {
+	Blocks []ResourceBlock
+	Footer []string
+}
+
+// parseBlocks reads terraform plan/apply output from r and returns parsed
+// resource blocks (each with summary and body) and any trailing footer lines.
+// It applies the same suppression rules as filterOutput.
+func parseBlocks(r io.Reader) parseResult {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 1024*1024)
 	scanner.Buffer(buf, len(buf))
 
 	var state filterState
 	depth := 0
-	inNote := false       // suppress multi-line "Note:" advisory
-	inIntroBlock := false // suppress "Terraform used the selected providers" block
-	pendingBlank := false // defer blank lines so inter-header blanks can be dropped
-	hasEmitted := false   // suppress leading blank before first real content
+	inNote := false
+	inIntroBlock := false
+	pendingBlank := false
+	hasEmitted := false
 
-	emit := func(line string) {
+	var result parseResult
+	var currentSummary string
+	var bodyLines []string
+
+	saveBlock := func() {
+		if currentSummary == "" {
+			return
+		}
+		result.Blocks = append(result.Blocks, ResourceBlock{
+			Summary: currentSummary,
+			Body:    bodyLines,
+		})
+		currentSummary = ""
+		bodyLines = nil
+	}
+
+	addFooter := func(line string) {
 		if pendingBlank && hasEmitted {
-			fmt.Fprintln(w, "")
+			result.Footer = append(result.Footer, "")
 		}
 		pendingBlank = false
-		fmt.Fprintln(w, line)
+		result.Footer = append(result.Footer, line)
 		hasEmitted = true
 	}
 
@@ -164,8 +188,7 @@ func filterOutput(r io.Reader, w io.Writer) {
 			continue
 		}
 
-		// Blank lines: record as pending rather than emitting immediately, so we
-		// can drop blanks that turn out to be between two resource headers.
+		// Blank lines: record as pending rather than processing immediately.
 		if plain == "" {
 			pendingBlank = true
 			continue
@@ -177,10 +200,14 @@ func filterOutput(r io.Reader, w io.Writer) {
 				state = stateAfterHeader
 				trimmed := plain[4:]
 				if strings.Contains(trimmed, "module") {
-					emit(formatResourceHeader(line))
+					currentSummary = formatResourceHeader(line)
+					pendingBlank = false
+					hasEmitted = true
+				} else {
+					pendingBlank = false
 				}
 			} else {
-				emit(line)
+				addFooter(line)
 			}
 
 		case stateAfterHeader:
@@ -190,32 +217,55 @@ func filterOutput(r io.Reader, w io.Writer) {
 				// Secondary parenthetical comment (e.g. "# (because ...)"); suppress.
 				pendingBlank = false
 			case strings.HasPrefix(plain, "  # "):
-				// Another primary resource header; drop inter-header blank, print it.
+				// Another primary resource header (piped format — no body for previous).
+				saveBlock()
 				pendingBlank = false
 				trimmed := plain[4:]
 				if strings.Contains(trimmed, "module") {
-					emit(formatResourceHeader(line))
+					currentSummary = formatResourceHeader(line)
+					hasEmitted = true
 				}
-				// stay in stateAfterHeader
 			case bc > 0:
 				// Block opener (e.g. `resource "..." {`); suppress blank before block.
 				pendingBlank = false
 				depth = bc
+				bodyLines = nil
 				state = stateInBlock
 			default:
-				// First non-header line after the list (e.g. "Plan:"); re-emit the
-				// pending blank as a visual separator, then print the line.
-				emit(line)
+				// First non-header line after the resource list; save pending block
+				// and emit the line as footer.
+				saveBlock()
+				addFooter(line)
 				state = stateNormal
 			}
 
 		case stateInBlock:
+			bodyLines = append(bodyLines, line)
 			depth += countBraces(plain)
 			if depth <= 0 {
 				depth = 0
+				saveBlock()
 				state = stateAfterHeader // next resource's header may follow
 			}
 		}
+	}
+
+	// Save any remaining pending block (e.g. last resource in piped format).
+	saveBlock()
+
+	return result
+}
+
+// filterOutput reads terraform plan/apply output from r and writes a collapsed
+// version to w. It wraps parseBlocks and emits block summaries followed by
+// any footer lines.
+func filterOutput(r io.Reader, w io.Writer) {
+	result := parseBlocks(r)
+	for _, b := range result.Blocks {
+		fmt.Fprintln(w, b.Summary)
+	}
+	for _, line := range result.Footer {
+		fmt.Fprintln(w, line)
 	}
 }
 
