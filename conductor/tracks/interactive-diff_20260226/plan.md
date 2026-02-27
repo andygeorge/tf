@@ -37,11 +37,11 @@ expand/collapse state.
 
 ### Tasks
 
-- [ ] Task 2.1: Implement a `Viewer` type with a list of blocks, a cursor index,
+- [x] Task 2.1: Implement a `Viewer` type with a list of blocks, a cursor index,
       and per-block expanded/collapsed state.
-- [ ] Task 2.2: Implement the render loop: draw collapsed summaries with a cursor
+- [x] Task 2.2: Implement the render loop: draw collapsed summaries with a cursor
       indicator; draw full body lines for expanded blocks.
-- [ ] Task 2.3: Implement keyboard input handling — arrow keys / j/k to move
+- [x] Task 2.3: Implement keyboard input handling — arrow keys / j/k to move
       cursor, Enter/Space to toggle expand/collapse, q/Ctrl-C to quit.
 - [ ] Task 2.4: Write unit tests for viewer state transitions (navigate, expand,
       collapse, exit).

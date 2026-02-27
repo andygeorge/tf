@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // version is set at build time via -ldflags "-X main.version=vX.Y.Z".
@@ -296,6 +298,140 @@ func targetOutput(r io.Reader, w io.Writer) {
 			fmt.Fprintf(w, "-target=%s\n", t)
 		}
 	}
+}
+
+// --- Interactive viewer ---
+
+// ANSI escape sequences used by the interactive viewer.
+const (
+	viewerClearScreen   = "\x1b[2J"
+	viewerCursorHome    = "\x1b[H"
+	viewerCursorHide    = "\x1b[?25l"
+	viewerCursorShow    = "\x1b[?25h"
+	viewerAltEnter      = "\x1b[?1049h" // switch to alternate screen buffer
+	viewerAltLeave      = "\x1b[?1049l" // switch back to main screen buffer
+	viewerInvert        = "\x1b[7m"
+	viewerBoldReset     = "\x1b[0m"
+)
+
+// Viewer holds the interactive diff viewer state.
+type Viewer struct {
+	blocks   []ResourceBlock
+	cursor   int
+	expanded []bool
+}
+
+func newViewer(blocks []ResourceBlock) *Viewer {
+	return &Viewer{
+		blocks:   blocks,
+		cursor:   0,
+		expanded: make([]bool, len(blocks)),
+	}
+}
+
+// navigate moves the cursor by delta, clamped to valid range.
+func (v *Viewer) navigate(delta int) {
+	if len(v.blocks) == 0 {
+		return
+	}
+	v.cursor += delta
+	if v.cursor < 0 {
+		v.cursor = 0
+	}
+	if v.cursor >= len(v.blocks) {
+		v.cursor = len(v.blocks) - 1
+	}
+}
+
+// toggle flips the expanded state for the block at cursor.
+func (v *Viewer) toggle() {
+	if len(v.blocks) == 0 {
+		return
+	}
+	v.expanded[v.cursor] = !v.expanded[v.cursor]
+}
+
+// render writes the full viewer UI to w. Uses \r\n for correct rendering in
+// raw terminal mode.
+func render(v *Viewer, w io.Writer) {
+	fmt.Fprint(w, viewerClearScreen+viewerCursorHome)
+	fmt.Fprintf(w, "\x1b[1m tf interactive diff — %d resource(s) \x1b[0m\r\n", len(v.blocks))
+	fmt.Fprint(w, "  j/k or \u2191\u2193 to navigate  Enter/Space to expand  q to quit\r\n\r\n")
+
+	for i, b := range v.blocks {
+		if i == v.cursor {
+			fmt.Fprintf(w, "%s\u25b6 %s%s\r\n", viewerInvert, b.Summary, viewerBoldReset)
+		} else {
+			fmt.Fprintf(w, "  %s%s\r\n", b.Summary, viewerBoldReset)
+		}
+		if v.expanded[i] {
+			if len(b.Body) == 0 {
+				fmt.Fprint(w, "    (no diff body captured)\r\n")
+			} else {
+				for _, line := range b.Body {
+					fmt.Fprintf(w, "    %s\r\n", line)
+				}
+			}
+		}
+	}
+}
+
+// runViewer launches the interactive terminal viewer. It uses the alternate
+// screen buffer so the original terminal content is restored on exit.
+// After exiting, collapsed summaries are printed to stdout for scrollback.
+func runViewer(blocks []ResourceBlock) error {
+	// Open /dev/tty explicitly — os.Stdin may be connected to the terraform pipe.
+	tty, err := os.Open("/dev/tty")
+	if err != nil {
+		return fmt.Errorf("open /dev/tty: %w", err)
+	}
+	defer tty.Close()
+
+	oldState, err := term.MakeRaw(int(tty.Fd()))
+	if err != nil {
+		return fmt.Errorf("raw mode: %w", err)
+	}
+
+	v := newViewer(blocks)
+	fmt.Fprint(os.Stdout, viewerAltEnter+viewerCursorHide)
+	render(v, os.Stdout)
+
+	buf := make([]byte, 4)
+	quit := false
+	for !quit {
+		n, err := tty.Read(buf)
+		if err != nil || n == 0 {
+			break
+		}
+		switch {
+		case buf[0] == 'q' || buf[0] == 3: // q or Ctrl-C
+			quit = true
+		case buf[0] == 'j' || (n >= 3 && buf[0] == 27 && buf[1] == '[' && buf[2] == 'B'): // j or ↓
+			v.navigate(+1)
+		case buf[0] == 'k' || (n >= 3 && buf[0] == 27 && buf[1] == '[' && buf[2] == 'A'): // k or ↑
+			v.navigate(-1)
+		case buf[0] == 13 || buf[0] == 32: // Enter or Space
+			v.toggle()
+		}
+		if !quit {
+			render(v, os.Stdout)
+		}
+	}
+
+	// Restore terminal before printing final output.
+	term.Restore(int(tty.Fd()), oldState) //nolint:errcheck
+	fmt.Fprint(os.Stdout, viewerCursorShow+viewerAltLeave)
+
+	// Print collapsed summaries to the main screen for terminal scrollback.
+	for _, b := range v.blocks {
+		fmt.Fprintln(os.Stdout, b.Summary)
+	}
+	return nil
+}
+
+// isPlanApply reports whether the first argument is "plan" or "apply".
+func isPlanApply(args []string) bool {
+	return len(args) > 0 && (args[0] == "plan" || args[0] == "apply")
 }
 
 func main() {
