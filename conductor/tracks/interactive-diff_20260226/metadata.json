@@ -2,18 +2,27 @@
   "id": "interactive-diff_20260226",
   "title": "Interactive Diff Toggle",
   "type": "feature",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-02-26T00:00:00Z",
   "updated": "2026-02-27T00:00:00Z",
-  "current_phase": 1,
-  "current_task": "1.1",
+  "current_phase": 4,
+  "current_task": "4.3",
   "phases": {
     "total": 4,
-    "completed": 0
+    "completed": 4
   },
   "tasks": {
     "total": 13,
-    "completed": 0
+    "completed": 13
   },
-  "commits": []
+  "commits": [
+    "06878b6: refactor: extract parseBlocks from filterOutput, add ResourceBlock type",
+    "9da2a67: test: add block parsing tests for all resource change types",
+    "e8d2ad5: feat: add Viewer type with navigate/toggle state, render, and runViewer",
+    "f175159: test: add viewer state transition and render unit tests",
+    "4830865: feat: integrate interactive viewer into plan/apply TTY path",
+    "9ad764c: fix: handle edge cases for empty plan and large resource lists",
+    "c001a0a: docs: update README with interactive diff viewer feature",
+    "ca24ad9: chore: gofmt formatting fixes"
+  ]
 }

@@ -1,0 +1,35 @@
+{
+  "status": "complete",
+  "project_type": "brownfield",
+  "current_section": "complete",
+  "current_question": 0,
+  "completed_sections": ["product", "guidelines", "tech_stack", "workflow", "styleguides"],
+  "answers": {
+    "project_name": "tf",
+    "description": "A CLI tool that wraps terraform with simplified, improved output",
+    "problem": "Terraform's verbose output makes it hard to quickly understand what's changing",
+    "target_users": "Infrastructure engineers and DevOps practitioners using Terraform",
+    "key_goals": "Be a seamless drop-in for terraform; minimize noise in plan/apply output; make targeting easy",
+    "voice_tone": "Concise and direct",
+    "design_principles": ["Developer experience focused", "Simplicity over features"],
+    "primary_language": "Go 1.22",
+    "distribution": "go install (binary distribution via Go module proxy)",
+    "tdd_strictness": "Moderate - tests encouraged, not blocked",
+    "commit_strategy": "Conventional Commits (feat:, fix:, chore:, etc.)",
+    "code_review": "Optional / self-review OK",
+    "verification": "Only at track completion",
+    "style_guides": ["Go"],
+    "existing_tooling": "Yes, use existing configs"
+  },
+  "files_created": [
+    "conductor/index.md",
+    "conductor/product.md",
+    "conductor/product-guidelines.md",
+    "conductor/tech-stack.md",
+    "conductor/workflow.md",
+    "conductor/tracks.md",
+    "conductor/code_styleguides/go.md"
+  ],
+  "started_at": "2026-02-26T00:00:00Z",
+  "last_updated": "2026-02-26T00:00:00Z"
+}
