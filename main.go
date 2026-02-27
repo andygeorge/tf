@@ -485,7 +485,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	filterOutput(stdout, os.Stdout)
+	result := parseBlocks(stdout)
 
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -493,5 +493,20 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "tf: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Launch interactive viewer for plan/apply when stdout is a TTY and there
+	// are resource blocks to display; otherwise fall back to plain output.
+	if isPlanApply(args) && term.IsTerminal(int(os.Stdout.Fd())) && len(result.Blocks) > 0 {
+		if err := runViewer(result.Blocks); err != nil {
+			fmt.Fprintf(os.Stderr, "tf: viewer: %v\n", err)
+		}
+	} else {
+		for _, b := range result.Blocks {
+			fmt.Fprintln(os.Stdout, b.Summary)
+		}
+		for _, line := range result.Footer {
+			fmt.Fprintln(os.Stdout, line)
+		}
 	}
 }

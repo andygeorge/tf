@@ -57,11 +57,11 @@ execution path.
 
 ### Tasks
 
-- [ ] Task 3.1: After `terraform plan`/`apply` completes, check if stdout is a TTY;
+- [x] Task 3.1: After `terraform plan`/`apply` completes, check if stdout is a TTY;
       if so, launch the viewer with the captured blocks.
-- [ ] Task 3.2: If stdout is not a TTY (piped / CI), fall back to printing collapsed
+- [x] Task 3.2: If stdout is not a TTY (piped / CI), fall back to printing collapsed
       summaries as before (no interactive mode).
-- [ ] Task 3.3: Ensure all non-plan/apply commands (`tf target`, `tf ver`,
+- [x] Task 3.3: Ensure all non-plan/apply commands (`tf target`, `tf ver`,
       passthrough) are completely unaffected.
 
 ### Verification
