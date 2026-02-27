@@ -229,7 +229,7 @@ func parseBlocks(r io.Reader) parseResult {
 				// Block opener (e.g. `resource "..." {`); suppress blank before block.
 				pendingBlank = false
 				depth = bc
-				bodyLines = nil
+				bodyLines = []string{line} // include opener in body
 				state = stateInBlock
 			default:
 				// First non-header line after the resource list; save pending block

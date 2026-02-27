@@ -305,3 +305,204 @@ Plan: 1 to add, 0 to change, 2 to destroy.`
 		t.Error("plan summary should be suppressed")
 	}
 }
+
+// --- parseBlocks tests ---
+
+func TestParseBlocks_AddOperation(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_instance.web will be created
++ resource "aws_instance" "web" {
+      ami = "ami-12345"
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(result.Blocks))
+	}
+	b := result.Blocks[0]
+	if !strings.Contains(b.Summary, "module.api.aws_instance.web will be created") {
+		t.Errorf("summary missing resource address: %q", b.Summary)
+	}
+	if !strings.HasPrefix(b.Summary, "\x1b[1m") {
+		t.Error("summary should start with bold ANSI code")
+	}
+	if len(b.Body) == 0 {
+		t.Error("body should not be empty for add operation")
+	}
+	bodyText := strings.Join(b.Body, "\n")
+	if !strings.Contains(bodyText, `resource "aws_instance"`) {
+		t.Error("body should contain block opener")
+	}
+}
+
+func TestParseBlocks_DestroyOperation(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_instance.web will be destroyed
+- resource "aws_instance" "web" {
+      id = "i-12345"
+    }
+
+Plan: 0 to add, 0 to change, 1 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(result.Blocks))
+	}
+	if !strings.Contains(result.Blocks[0].Summary, "will be destroyed") {
+		t.Error("summary should indicate destroy operation")
+	}
+	if len(result.Blocks[0].Body) == 0 {
+		t.Error("body should not be empty for destroy operation")
+	}
+}
+
+func TestParseBlocks_ChangeOperation(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_instance.web will be updated in-place
+~ resource "aws_instance" "web" {
+      ~ instance_type = "t2.micro" -> "t3.micro"
+        id            = "i-12345"
+    }
+
+Plan: 0 to add, 1 to change, 0 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(result.Blocks))
+	}
+	if !strings.Contains(result.Blocks[0].Summary, "will be updated in-place") {
+		t.Error("summary should indicate update operation")
+	}
+	bodyText := strings.Join(result.Blocks[0].Body, "\n")
+	if !strings.Contains(bodyText, "instance_type") {
+		t.Error("body should contain changed attribute")
+	}
+}
+
+func TestParseBlocks_ReplaceOperation(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_ebs_volume.data must be replaced
+-/+ resource "aws_ebs_volume" "data" {
+      ~ size = 10 -> 20 # forces replacement
+        type = "gp2"
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(result.Blocks))
+	}
+	if !strings.Contains(result.Blocks[0].Summary, "must be replaced") {
+		t.Error("summary should indicate replace operation")
+	}
+}
+
+func TestParseBlocks_BodyCaptured(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_instance.web must be replaced
+-/+ resource "aws_instance" "web" {
+      ~ ami  = "old-ami" -> "new-ami" # forces replacement
+        id   = "i-12345"
+        tags = {
+            "Name" = "web"
+        }
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(result.Blocks))
+	}
+	body := result.Blocks[0].Body
+	if len(body) == 0 {
+		t.Fatal("body should not be empty")
+	}
+	bodyText := strings.Join(body, "\n")
+	if !strings.Contains(bodyText, "ami") {
+		t.Error("body should contain changed attribute")
+	}
+	if !strings.Contains(bodyText, "tags") {
+		t.Error("body should contain nested block")
+	}
+}
+
+func TestParseBlocks_EmptyPlan(t *testing.T) {
+	input := `No changes. Your infrastructure matches the configuration.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 0 {
+		t.Errorf("expected 0 blocks for empty plan, got %d", len(result.Blocks))
+	}
+}
+
+func TestParseBlocks_MultipleBlocks(t *testing.T) {
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_instance.web will be created
++ resource "aws_instance" "web" {
+      ami = "ami-12345"
+    }
+
+  # module.api.aws_s3_bucket.data will be destroyed
+- resource "aws_s3_bucket" "data" {
+      id = "my-bucket"
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 2 {
+		t.Fatalf("expected 2 blocks, got %d", len(result.Blocks))
+	}
+	if !strings.Contains(result.Blocks[0].Summary, "will be created") {
+		t.Error("first block should be the create")
+	}
+	if !strings.Contains(result.Blocks[1].Summary, "will be destroyed") {
+		t.Error("second block should be the destroy")
+	}
+}
+
+func TestParseBlocks_PipedFormat(t *testing.T) {
+	// Piped format: headers only, no block bodies.
+	input := `Terraform will perform the following actions:
+
+  # module.api.aws_autoscaling_group.myapp will be destroyed
+
+  # module.api.aws_cloudwatch_log_group.logs will be destroyed
+
+Plan: 0 to add, 0 to change, 2 to destroy.`
+
+	result := parseBlocks(strings.NewReader(input))
+
+	if len(result.Blocks) != 2 {
+		t.Fatalf("expected 2 blocks, got %d", len(result.Blocks))
+	}
+	if result.Blocks[0].Body != nil {
+		t.Error("piped format block should have nil body")
+	}
+	if result.Blocks[1].Body != nil {
+		t.Error("piped format block should have nil body")
+	}
+	if !strings.Contains(result.Blocks[0].Summary, "aws_autoscaling_group.myapp") {
+		t.Error("first block summary missing")
+	}
+	if !strings.Contains(result.Blocks[1].Summary, "aws_cloudwatch_log_group.logs") {
+		t.Error("second block summary missing")
+	}
+}

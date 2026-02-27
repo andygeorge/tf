@@ -23,7 +23,7 @@ full diff body in memory, enabling the TUI to re-display it on demand.
       `body` ([]string of original lines).
 - [x] Task 1.2: Refactor the output filtering logic to populate `ResourceBlock`
       slices instead of only printing collapsed summaries.
-- [ ] Task 1.3: Write unit tests covering block parsing for add, change, destroy,
+- [x] Task 1.3: Write unit tests covering block parsing for add, change, destroy,
       and replace operations.
 
 ### Verification
