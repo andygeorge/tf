@@ -304,14 +304,14 @@ func targetOutput(r io.Reader, w io.Writer) {
 
 // ANSI escape sequences used by the interactive viewer.
 const (
-	viewerClearScreen   = "\x1b[2J"
-	viewerCursorHome    = "\x1b[H"
-	viewerCursorHide    = "\x1b[?25l"
-	viewerCursorShow    = "\x1b[?25h"
-	viewerAltEnter      = "\x1b[?1049h" // switch to alternate screen buffer
-	viewerAltLeave      = "\x1b[?1049l" // switch back to main screen buffer
-	viewerInvert        = "\x1b[7m"
-	viewerBoldReset     = "\x1b[0m"
+	viewerClearScreen = "\x1b[2J"
+	viewerCursorHome  = "\x1b[H"
+	viewerCursorHide  = "\x1b[?25l"
+	viewerCursorShow  = "\x1b[?25h"
+	viewerAltEnter    = "\x1b[?1049h" // switch to alternate screen buffer
+	viewerAltLeave    = "\x1b[?1049l" // switch back to main screen buffer
+	viewerInvert      = "\x1b[7m"
+	viewerBoldReset   = "\x1b[0m"
 )
 
 // Viewer holds the interactive diff viewer state.

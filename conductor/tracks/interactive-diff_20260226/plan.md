@@ -79,7 +79,7 @@ Handle edge cases, clean up, and ensure the feature is ready for use.
       "No changes." message and exits immediately), single resource, large
       numbers of resources.
 - [x] Task 4.2: Update README.md with usage notes for the interactive diff viewer.
-- [ ] Task 4.3: Run full `make check` and fix any fmt/vet/lint issues.
+- [x] Task 4.3: Run full `make check` and fix any fmt/vet/lint issues.
 
 ### Verification
 
